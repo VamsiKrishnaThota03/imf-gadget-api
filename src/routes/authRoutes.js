@@ -7,8 +7,8 @@ const router = express.Router();
  * @swagger
  * /api/auth/register:
  *   post:
- *     summary: Register a new agent
  *     tags: [Auth]
+ *     summary: Register a new agent
  *     requestBody:
  *       required: true
  *       content:
@@ -33,8 +33,8 @@ router.post('/register', register);
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Login to get access token
  *     tags: [Auth]
+ *     summary: Login to get access token
  *     requestBody:
  *       required: true
  *       content:

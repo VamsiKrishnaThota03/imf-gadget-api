@@ -10,9 +10,13 @@ const options = {
     },
     servers: [
       {
+        url: 'https://imf-gadget-api-dhbc.onrender.com',
+        description: 'Production server',
+      },
+      {
         url: 'http://localhost:3000',
         description: 'Development server',
-      },
+      }
     ],
     components: {
       securitySchemes: {

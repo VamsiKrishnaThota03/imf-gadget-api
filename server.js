@@ -9,14 +9,21 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware
+// CORS configuration
 app.use(cors());
+app.options('*', cors());
+
 app.use(express.json());
 
 // Swagger documentation route
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  explorer: true,
+  swaggerOptions: {
+    persistAuthorization: true
+  }
+}));
 
-// Routes
+// Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/gadgets', gadgetRoutes);
 
@@ -28,7 +35,6 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-// Sync database and start server
 sequelize.sync().then(() => {
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
