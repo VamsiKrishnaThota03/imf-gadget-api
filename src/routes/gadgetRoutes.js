@@ -22,7 +22,7 @@ const router = express.Router();
  * /api/gadgets:
  *   get:
  *     tags: [Gadgets]
- *     summary: Get all gadgets
+ *     summary: Get all gadgets with optional status filter
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -31,10 +31,11 @@ const router = express.Router();
  *         schema:
  *           type: string
  *           enum: [Available, Deployed, Destroyed, Decommissioned]
+ *         required: false
  *         description: Filter gadgets by status
  *     responses:
  *       200:
- *         description: Success
+ *         description: List of gadgets
  *         content:
  *           application/json:
  *             schema:
@@ -43,10 +44,43 @@ const router = express.Router();
  *                 count:
  *                   type: integer
  *                   description: Total number of gadgets
+ *                   example: 1
  *                 gadgets:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/Gadget'
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                         example: "dd3d247a-98b3-44b3-802c-9ee228d41afb"
+ *                       name:
+ *                         type: string
+ *                         example: "Exploding Pen"
+ *                       codename:
+ *                         type: string
+ *                         example: "Operation Shadow"
+ *                       status:
+ *                         type: string
+ *                         enum: [Available, Deployed, Destroyed, Decommissioned]
+ *                         example: "Available"
+ *                       decommissionedAt:
+ *                         type: string
+ *                         nullable: true
+ *                         example: null
+ *                       missionSuccessProbability:
+ *                         type: string
+ *                         example: "100%"
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *       400:
+ *         description: Invalid status parameter
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
  */
 router.get('/', auth, getAllGadgets);
 
