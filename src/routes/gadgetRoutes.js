@@ -12,17 +12,72 @@ const router = express.Router();
 
 /**
  * @swagger
+ * tags:
+ *   name: Gadgets
+ *   description: IMF Gadget management endpoints
+ */
+
+/**
+ * @swagger
  * /api/gadgets:
  *   get:
  *     tags: [Gadgets]
  *     summary: Get all gadgets
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [Available, Deployed, Destroyed, Decommissioned]
+ *         description: Filter gadgets by status
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ *                   description: Total number of gadgets
+ *                 gadgets:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Gadget'
  */
 router.get('/', auth, getAllGadgets);
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Gadget:
+ *       type: object
+ *       required:
+ *         - name
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         name:
+ *           type: string
+ *           example: "Laser Watch"
+ *         codename:
+ *           type: string
+ *           example: "The Phoenix"
+ *         status:
+ *           type: string
+ *           enum: [Available, Deployed, Destroyed, Decommissioned]
+ *         missionSuccessProbability:
+ *           type: number
+ *           example: 85
+ *         decommissionedAt:
+ *           type: string
+ *           format: date-time
+ */
 
 /**
  * @swagger
@@ -38,6 +93,8 @@ router.get('/', auth, getAllGadgets);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - name
  *             properties:
  *               name:
  *                 type: string
@@ -45,6 +102,10 @@ router.get('/', auth, getAllGadgets);
  *     responses:
  *       201:
  *         description: Created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Gadget'
  */
 router.post('/', auth, createGadget);
 
