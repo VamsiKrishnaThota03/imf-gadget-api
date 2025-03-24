@@ -12,47 +12,109 @@ const router = express.Router();
 
 /**
  * @swagger
- * components:
- *   schemas:
- *     Gadget:
- *       type: object
- *       properties:
- *         id:
- *           type: string
- *           format: uuid
- *         name:
- *           type: string
- *         codename:
- *           type: string
- *         status:
- *           type: string
- *           enum: [Available, Deployed, Destroyed, Decommissioned]
- *         missionSuccessProbability:
- *           type: number
+ * /api/gadgets:
+ *   get:
+ *     tags: [Gadgets]
+ *     summary: Get all gadgets
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
  */
+router.get('/', auth, getAllGadgets);
 
 /**
  * @swagger
  * /api/gadgets:
- *   get:
- *     summary: Get all gadgets
+ *   post:
  *     tags: [Gadgets]
+ *     summary: Create a new gadget
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Laser Watch"
+ *     responses:
+ *       201:
+ *         description: Created
+ */
+router.post('/', auth, createGadget);
+
+/**
+ * @swagger
+ * /api/gadgets/{id}:
+ *   patch:
+ *     tags: [Gadgets]
+ *     summary: Update gadget status
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: status
+ *       - in: path
+ *         name: id
+ *         required: true
  *         schema:
  *           type: string
- *           enum: [Available, Deployed, Destroyed, Decommissioned]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [Available, Deployed, Destroyed, Decommissioned]
  *     responses:
  *       200:
- *         description: List of gadgets
+ *         description: Updated
  */
-router.get('/', auth, getAllGadgets);
-router.post('/', createGadget);
-router.patch('/:id', updateGadget);
-router.delete('/:id', deleteGadget);
-router.post('/:id/self-destruct', selfDestruct);
+router.patch('/:id', auth, updateGadget);
 
-module.exports = router; 
+/**
+ * @swagger
+ * /api/gadgets/{id}:
+ *   delete:
+ *     tags: [Gadgets]
+ *     summary: Delete a gadget
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Deleted
+ */
+router.delete('/:id', auth, deleteGadget);
+
+/**
+ * @swagger
+ * /api/gadgets/{id}/self-destruct:
+ *   post:
+ *     tags: [Gadgets]
+ *     summary: Self destruct a gadget
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Self-destruct initiated
+ */
+router.post('/:id/self-destruct', auth, selfDestruct);
+
+module.exports = router;
