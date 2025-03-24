@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid');
 const { Gadget } = require('../models');
 const { generateCodename, generateConfirmationCode } = require('../utils/helpers');
 
@@ -8,32 +9,34 @@ const getAllGadgets = async (req, res) => {
   try {
     const { status } = req.query;
 
+    // If no status provided, return all gadgets
+    if (!status) {
+      const gadgets = await Gadget.findAll();
+      return res.json({
+        count: gadgets.length,
+        gadgets
+      });
+    }
+
     // Validate status if provided
-    if (status && !VALID_STATUSES.includes(status)) {
+    if (!VALID_STATUSES.includes(status)) {
       return res.status(400).json({ 
         message: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`
       });
     }
 
-    // Build where clause based on status filter
-    const where = status ? { status } : {};
-    
-    // Get gadgets with filter and sorting
-    const gadgets = await Gadget.findAll({ 
-      where,
+    // Get filtered gadgets
+    const gadgets = await Gadget.findAll({
+      where: { status },
       order: [['createdAt', 'DESC']]
     });
 
-    // Return count with filtered gadgets
     res.json({
       count: gadgets.length,
-      gadgets: gadgets.map(gadget => ({
-        ...gadget.toJSON(),
-        missionSuccessProbability: `${gadget.missionSuccessProbability}%`
-      }))
+      gadgets
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Error fetching gadgets' });
   }
 };
 
