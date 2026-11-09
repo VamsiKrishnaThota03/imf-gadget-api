@@ -1,43 +1,28 @@
-const express = require('express');
-const cors = require('cors');
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./src/config/swagger');
-const { sequelize } = require('./src/models');
-const gadgetRoutes = require('./src/routes/gadgetRoutes');
-const authRoutes = require('./src/routes/authRoutes');
 require('dotenv').config();
+const { requireEnv } = require('./src/config/env');
 
-const app = express();
+// Fail fast before opening a port when required configuration is missing.
+requireEnv('JWT_SECRET');
+requireEnv('DATABASE_URL');
 
-// CORS configuration
-app.use(cors());
-app.options('*', cors());
+const app = require('./src/app');
+const { sequelize } = require('./src/models');
 
-app.use(express.json());
+const PORT = Number(process.env.PORT) || 3000;
+// Loopback by default for local development. Render sets RENDER=true and needs
+// an all-interfaces bind inside its container; HOST can override either way.
+const HOST = process.env.HOST || (process.env.RENDER ? '0.0.0.0' : '127.0.0.1');
 
-// Swagger documentation route
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  explorer: true,
-  swaggerOptions: {
-    persistAuthorization: true
-  }
-}));
-
-// Mount routes
-app.use('/api/auth', authRoutes);
-app.use('/api/gadgets', gadgetRoutes);
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
-});
-
-const PORT = process.env.PORT || 3000;
-
-sequelize.sync().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`API Documentation available at http://localhost:${PORT}/api-docs`);
+sequelize
+  .authenticate()
+  .then(() => sequelize.sync())
+  .then(() => {
+    app.listen(PORT, HOST, () => {
+      console.log(`Server is running on http://${HOST}:${PORT}`);
+      console.log(`API documentation: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/api-docs`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to start: could not connect to the database.', error.message);
+    process.exit(1);
   });
-}); 

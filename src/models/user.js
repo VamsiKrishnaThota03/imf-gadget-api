@@ -1,5 +1,7 @@
 const bcrypt = require('bcryptjs');
 
+const SALT_ROUNDS = 10;
+
 module.exports = (sequelize, DataTypes) => {
   const User = sequelize.define('User', {
     id: {
@@ -18,15 +20,23 @@ module.exports = (sequelize, DataTypes) => {
     },
   }, {
     hooks: {
-      beforeCreate: async (user) => {
-        user.password = await bcrypt.hash(user.password, 10);
+      beforeSave: async (user) => {
+        if (user.changed('password')) {
+          user.password = await bcrypt.hash(user.password, SALT_ROUNDS);
+        }
       },
     },
   });
 
-  User.prototype.validatePassword = async function(password) {
+  User.prototype.validatePassword = async function validatePassword(password) {
     return bcrypt.compare(password, this.password);
   };
 
+  // Never serialise the password hash in API responses.
+  User.prototype.toJSON = function toJSON() {
+    const { password, ...safe } = this.get();
+    return safe;
+  };
+
   return User;
-}; 
+};
