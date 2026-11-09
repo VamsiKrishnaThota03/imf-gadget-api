@@ -25,7 +25,11 @@ const router = express.Router();
  *                 type: string
  *     responses:
  *       201:
- *         description: Registration successful
+ *         description: Registration successful; returns the user and a JWT
+ *       400:
+ *         description: Invalid username or password (min 8 characters)
+ *       409:
+ *         description: Username already taken
  */
 router.post('/register', register);
 
@@ -51,7 +55,9 @@ router.post('/register', register);
  *                 type: string
  *     responses:
  *       200:
- *         description: Login successful
+ *         description: Login successful; returns the user and a JWT
+ *       401:
+ *         description: Invalid credentials
  */
 router.post('/login', login);
 

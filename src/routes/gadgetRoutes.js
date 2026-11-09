@@ -22,49 +22,21 @@ const router = express.Router();
  * /api/gadgets:
  *   get:
  *     tags: [Gadgets]
- *     summary: Get all gadgets
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of all gadgets
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 count:
- *                   type: integer
- *                   description: Total number of gadgets
- *                 gadgets:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Gadget'
- *       401:
- *         description: Unauthorized - Invalid or missing token
- */
-
-/**
- * @swagger
- * /api/gadgets?status={status}:
- *   get:
- *     tags: [Gadgets]
- *     summary: Filter gadgets by status
- *     description: Get gadgets filtered by their operational status
+ *     summary: List gadgets, optionally filtered by status
+ *     description: Returns gadgets newest first. Pass `status` to filter.
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: status
- *         required: true
+ *         required: false
  *         schema:
  *           type: string
  *           enum: [Available, Deployed, Destroyed, Decommissioned]
- *         description: Status to filter by
- *         example: Available
+ *         description: Only return gadgets with this status
  *     responses:
  *       200:
- *         description: List of filtered gadgets
+ *         description: List of gadgets
  *         content:
  *           application/json:
  *             schema:
@@ -72,7 +44,7 @@ const router = express.Router();
  *               properties:
  *                 count:
  *                   type: integer
- *                   description: Number of gadgets matching the status
+ *                   description: Number of gadgets returned
  *                 gadgets:
  *                   type: array
  *                   items:
@@ -80,7 +52,7 @@ const router = express.Router();
  *       400:
  *         description: Invalid status parameter
  *       401:
- *         description: Unauthorized - Invalid or missing token
+ *         description: Unauthorized - invalid or missing token
  */
 router.get('/', auth, getAllGadgets);
 
@@ -136,6 +108,8 @@ router.get('/', auth, getAllGadgets);
  *     responses:
  *       201:
  *         description: Created
+ *       400:
+ *         description: Missing or invalid name
  *         content:
  *           application/json:
  *             schema:
@@ -148,7 +122,8 @@ router.post('/', auth, createGadget);
  * /api/gadgets/{id}:
  *   patch:
  *     tags: [Gadgets]
- *     summary: Update gadget status
+ *     summary: Update a gadget's name and/or status
+ *     description: Only `name` and `status` can be changed; other fields are rejected with 400.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -157,18 +132,26 @@ router.post('/', auth, createGadget);
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *     requestBody:
+ *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
+ *               name:
+ *                 type: string
  *               status:
  *                 type: string
  *                 enum: [Available, Deployed, Destroyed, Decommissioned]
  *     responses:
  *       200:
  *         description: Updated
+ *       400:
+ *         description: Invalid or unsupported fields
+ *       404:
+ *         description: Gadget not found
  */
 router.patch('/:id', auth, updateGadget);
 
@@ -177,7 +160,7 @@ router.patch('/:id', auth, updateGadget);
  * /api/gadgets/{id}:
  *   delete:
  *     tags: [Gadgets]
- *     summary: Delete a gadget
+ *     summary: Decommission a gadget (soft delete)
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -188,7 +171,9 @@ router.patch('/:id', auth, updateGadget);
  *           type: string
  *     responses:
  *       200:
- *         description: Deleted
+ *         description: Gadget marked Decommissioned
+ *       404:
+ *         description: Gadget not found
  */
 router.delete('/:id', auth, deleteGadget);
 
@@ -208,7 +193,11 @@ router.delete('/:id', auth, deleteGadget);
  *           type: string
  *     responses:
  *       200:
- *         description: Self-destruct initiated
+ *         description: Self-destruct initiated; returns a confirmation code
+ *       404:
+ *         description: Gadget not found
+ *       409:
+ *         description: Gadget already destroyed
  */
 router.post('/:id/self-destruct', auth, selfDestruct);
 

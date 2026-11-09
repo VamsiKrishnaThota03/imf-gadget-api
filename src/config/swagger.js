@@ -1,3 +1,4 @@
+const path = require('path');
 const swaggerJsdoc = require('swagger-jsdoc');
 
 const options = {
@@ -6,9 +7,13 @@ const options = {
     info: {
       title: 'IMF Gadget API',
       version: '1.0.0',
-      description: 'A secure API for managing IMF gadgets',
+      description: 'Mission: Impossible-themed API for managing IMF gadgets. Register or log in, then click Authorize and paste the token.',
     },
     servers: [
+      {
+        url: '/',
+        description: 'Current host',
+      },
       {
         url: 'https://imf-gadget-api-dhbc.onrender.com',
         description: 'Production server',
@@ -28,7 +33,7 @@ const options = {
       },
     },
   },
-  apis: ['./src/routes/*.js'], // Path to the API routes
+  apis: [path.join(__dirname, '../routes/*.js')], // JSDoc-annotated route files
 };
 
 module.exports = swaggerJsdoc(options); 
