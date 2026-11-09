@@ -2,13 +2,12 @@ services:
   - type: web
     name: imf-gadget-api
     env: node
-    buildCommand: npm install
+    buildCommand: npm ci --omit=dev
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3000
       - key: DATABASE_URL
         fromDatabase:
           name: imf_gadgets
@@ -19,4 +18,6 @@ services:
 databases:
   - name: imf_gadgets
     plan: free
-    ipAllowList: []  # Allow all IPs 
+    # Empty allow list = no access from the public internet. The web service
+    # still connects over Render's private network via the internal URL above.
+    ipAllowList: []
