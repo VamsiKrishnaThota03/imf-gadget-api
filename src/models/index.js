@@ -1,16 +1,25 @@
-const { Sequelize } = require('sequelize');
+const { Sequelize, DataTypes } = require('sequelize');
 const config = require('../config/database');
+const { requireEnv } = require('../config/env');
 
 const env = process.env.NODE_ENV || 'development';
-const sequelize = new Sequelize(config[env].url, config[env]);
+const dbConfig = config[env] || config.development;
+
+let sequelize;
+if (env === 'test' && !process.env.DATABASE_URL) {
+  // Tests run against an in-memory Postgres emulation (dev dependency only).
+  // eslint-disable-next-line global-require
+  sequelize = require('./memoryDb')();
+} else {
+  sequelize = new Sequelize(requireEnv('DATABASE_URL'), dbConfig);
+}
 
 const db = {
   sequelize,
   Sequelize,
 };
 
-// Import models
-db.User = require('./user')(sequelize, Sequelize);
-db.Gadget = require('./gadget')(sequelize, Sequelize);
+db.User = require('./user')(sequelize, DataTypes);
+db.Gadget = require('./gadget')(sequelize, DataTypes);
 
-module.exports = db; 
+module.exports = db;

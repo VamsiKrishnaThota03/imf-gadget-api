@@ -1,15 +1,19 @@
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
+const { randomSuccessProbability } = require('../utils/helpers');
+
+const GADGET_STATUSES = ['Available', 'Deployed', 'Destroyed', 'Decommissioned'];
 
 module.exports = (sequelize, DataTypes) => {
   const Gadget = sequelize.define('Gadget', {
     id: {
       type: DataTypes.UUID,
       primaryKey: true,
-      defaultValue: () => uuidv4(),
+      defaultValue: () => randomUUID(),
     },
     name: {
       type: DataTypes.STRING,
       allowNull: false,
+      validate: { notEmpty: true, len: [1, 100] },
     },
     codename: {
       type: DataTypes.STRING,
@@ -17,7 +21,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
     },
     status: {
-      type: DataTypes.ENUM('Available', 'Deployed', 'Destroyed', 'Decommissioned'),
+      type: DataTypes.ENUM(...GADGET_STATUSES),
       defaultValue: 'Available',
     },
     decommissionedAt: {
@@ -27,9 +31,11 @@ module.exports = (sequelize, DataTypes) => {
     missionSuccessProbability: {
       type: DataTypes.FLOAT,
       allowNull: false,
-      defaultValue: () => Math.floor(Math.random() * 41) + 60, // 60-100%
+      defaultValue: randomSuccessProbability, // 60-100%
     },
   });
 
+  Gadget.STATUSES = GADGET_STATUSES;
+
   return Gadget;
-}; 
+};
