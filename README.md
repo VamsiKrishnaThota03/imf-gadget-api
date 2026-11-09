@@ -1,250 +1,151 @@
 # IMF Gadget API
 
+A Mission: Impossible-themed REST API for managing an IMF gadget inventory. It has JWT-authenticated agents, auto-generated codenames, mission success probabilities, soft decommissioning and a self-destruct endpoint. Built with Express, PostgreSQL and Sequelize, and documented with Swagger.
+
+![Node.js](https://img.shields.io/badge/Node.js-Express%204-339933?logo=nodedotjs&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Sequelize%206-4169E1?logo=postgresql&logoColor=white)
+![JWT](https://img.shields.io/badge/auth-JWT-000000?logo=jsonwebtokens)
+![Swagger](https://img.shields.io/badge/docs-Swagger-85EA2D?logo=swagger&logoColor=black)
+![Render](https://img.shields.io/badge/deployed%20on-Render-46E3B7?logo=render&logoColor=black)
+
+## Live demo
+
+- Swagger UI: **https://imf-gadget-api-dhbc.onrender.com/api-docs**
+- Base URL: `https://imf-gadget-api-dhbc.onrender.com`
+
 ## Overview
-A secure REST API for the Impossible Missions Force (IMF) to manage their high-tech gadgets. This API provides endpoints for gadget inventory management with features like self-destruct sequences and mission success probability calculations.
 
-## Live Demo
-API Documentation: [https://imf-gadget-api-dhbc.onrender.com/api-docs](https://imf-gadget-api-dhbc.onrender.com/api-docs)
-
-## Tech Stack
-- Node.js
-- Express.js
-- PostgreSQL
-- Sequelize ORM
-- JWT Authentication
-- bcrypt for password hashing
-- Swagger for API documentation
+Agents register and log in with a username and password and get a JWT. Every gadget endpoint requires that token. When a gadget is created it gets a random codename (for example "The Phoenix" or "Operation Kraken") and a random mission success probability between 60 and 100. Deleting a gadget is a soft delete: it is marked `Decommissioned` with a timestamp. The self-destruct endpoint marks it `Destroyed` and returns a random confirmation code. Sequelize creates the tables automatically on startup (`sequelize.sync()`).
 
 ## Features
-- 🔐 Secure JWT Authentication
-- 🎯 Dynamic Mission Success Probability
-- 🔄 Automatic Codename Generation
-- 💥 Self-Destruct Mechanism
-- 📊 Status Tracking System
-- 🔍 Filterable Gadget Search
-- 📚 Swagger Documentation
 
-## Prerequisites
-- Node.js (v14 or higher)
+- **JWT authentication:** register and log in with bcrypt-hashed passwords; send `Authorization: Bearer <token>` on gadget routes
+- **Gadget CRUD**, with gadget IDs as UUIDs
+- **Automatic codenames:** a random prefix (The / Project / Operation) plus a random noun, enforced unique at the database level
+- **Mission success probability:** a random whole number from 60 to 100, assigned on creation
+- **Status lifecycle:** `Available` (default), `Deployed`, `Destroyed`, `Decommissioned`
+- **Status filter:** `GET /api/gadgets?status=...`, with validation against the allowed values
+- **Soft delete:** `DELETE` sets `Decommissioned` and `decommissionedAt`
+- **Self-destruct:** sets `Destroyed` and returns a six-character confirmation code
+- **Interactive API docs** with `swagger-jsdoc` and `swagger-ui-express` (persisted authorization)
+- **Render blueprint** (`render.yaml`) that provisions the web service and a PostgreSQL database
+
+## Tech stack
+
+| Area | Tools |
+| --- | --- |
+| Runtime | Node.js, Express 4 |
+| Database | PostgreSQL, Sequelize 6 (`pg`) |
+| Auth | `jsonwebtoken`, `bcryptjs` |
+| Docs | `swagger-jsdoc`, `swagger-ui-express` |
+| Other | `uuid`, `cors`, `dotenv`, `nodemon` (dev) |
+| Hosting | Render |
+
+## Project structure
+
+```
+imf-gadget-api/
+├── server.js                 # Express app, Swagger UI, routes, DB sync
+├── render.yaml               # Render blueprint (web service + Postgres)
+└── src/
+    ├── config/
+    │   ├── database.js       # Sequelize config per NODE_ENV (SSL in production)
+    │   └── swagger.js        # OpenAPI definition + servers
+    ├── controllers/          # authController, gadgetController
+    ├── middleware/auth.js    # Bearer JWT verification
+    ├── models/               # User, Gadget
+    ├── routes/               # authRoutes, gadgetRoutes (with JSDoc Swagger annotations)
+    └── utils/helpers.js      # codename + confirmation code generators
+```
+
+## Getting started
+
+### Prerequisites
+
+- Node.js and npm
 - PostgreSQL
-- npm/yarn
 
-## Installation & Setup
+### Install and run
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/VamsiKrishnaThota03/imf-gadget-api.git
-   cd imf-gadget-api
-   ```
-2. **Install Dependencies**
-   ```bash
-   npm install
-   ```
-3. **Environment Configuration**
-   Create a `.env` file in the root directory:
-   ```bash
-   PORT=3000
-   DATABASE_URL=postgresql://postgres:your_password@localhost:5432/imf_gadgets
-   JWT_SECRET=your_secret_key
-   ```
-4. **Database Setup**
-   - Create PostgreSQL database named 'imf_gadgets'
-   - Tables will be auto-created on server start
+```bash
+git clone https://github.com/VamsiKrishnaThota03/imf-gadget-api.git
+cd imf-gadget-api
+npm install
+createdb imf_gadgets         # or create the database another way
+npm run dev                  # nodemon; or: npm start
+```
 
-5. **Start the Server**
-   - Development mode:
-     ```bash
-     npm run dev
-     ```
-   - Production mode:
-     ```bash
-     npm start
-     ```
+Swagger UI is then available at `http://localhost:3000/api-docs`.
 
-## API Documentation
+### Environment variables (`.env`)
 
-### Authentication
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `JWT_SECRET` | Yes | Secret for signing and verifying JWTs |
+| `PORT` | No | HTTP port (default `3000`) |
+| `NODE_ENV` | No | `development` (default), `test` or `production`. In production, SSL is used for the DB connection. |
 
-#### Register New Agent
-   ```http
-   POST /api/auth/register
-   Content-Type: application/json
-   {
-     "username": "agent007",
-     "password": "secret123"
-   }
-   ```
-   **Response:**
-   ```json
-   {
-     "user": {
-       "id": "uuid",
-       "username": "agent007"
-     },
-     "token": "jwt.token.here"
-   }
-   ```
+```env
+DATABASE_URL=postgresql://<user>:<password>@localhost:5432/imf_gadgets
+JWT_SECRET=<a-long-random-secret>
+PORT=3000
+NODE_ENV=development
+```
 
-#### Agent Login
-   ```http
-   POST /api/auth/login
-   Content-Type: application/json
-   {
-     "username": "agent007",
-     "password": "secret123"
-   }
-   ```
+### Scripts
 
-### Gadget Operations
+| Command | Description |
+| --- | --- |
+| `npm start` | `node server.js` |
+| `npm run dev` | `nodemon server.js` |
 
-All gadget endpoints require authentication header:
-   ```http
-   Authorization: Bearer your.jwt.token
-   ```
+## API
 
-#### List All Gadgets
-   ```http
-   GET /api/gadgets
-   ```
+All `/api/gadgets` routes need `Authorization: Bearer <token>`.
 
-#### Filter Gadgets by Status
-   ```http
-   GET /api/gadgets?status=Available
-   ```
-   **Status options:**
-   - Available: Gadgets ready for deployment
-   - Deployed: Currently in active mission use
-   - Destroyed: Gadgets that underwent self-destruct
-   - Decommissioned: Retired from service
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/api/auth/register` | Register an agent (`username`, `password`) and return the user and a token |
+| POST | `/api/auth/login` | Log in and return a token |
+| GET | `/api/gadgets` | List all gadgets as `{ count, gadgets }` |
+| GET | `/api/gadgets?status=Available` | Filter by status (`Available`, `Deployed`, `Destroyed`, `Decommissioned`); returns 400 for an invalid status |
+| POST | `/api/gadgets` | Create a gadget (`name`); codename and success probability are generated |
+| PATCH | `/api/gadgets/:id` | Update a gadget (for example `status`) |
+| DELETE | `/api/gadgets/:id` | Decommission (soft delete) and set `decommissionedAt` |
+| POST | `/api/gadgets/:id/self-destruct` | Mark as `Destroyed` and return `{ message, confirmationCode, gadget }` |
+| GET | `/api-docs` | Swagger UI |
 
-   **Example Responses:**
+### Example
 
-   **All Gadgets:**
-   ```json
-   {
-     "count": 2,
-     "gadgets": [
-       {
-         "id": "uuid1",
-         "name": "Laser Watch",
-         "codename": "The Phoenix",
-         "status": "Available",
-         "missionSuccessProbability": "85%"
-       },
-       {
-         "id": "uuid2",
-         "name": "Exploding Pen",
-         "codename": "The Dragon",
-         "status": "Deployed",
-         "missionSuccessProbability": "92%"
-       }
-     ]
-   }
-   ```
+```http
+POST /api/gadgets
+Authorization: Bearer <token>
+Content-Type: application/json
 
-#### Add New Gadget
-   ```http
-   POST /api/gadgets
-   Content-Type: application/json
-   {
-     "name": "Laser Watch"
-   }
-   ```
+{ "name": "Laser Watch" }
+```
 
-#### Update Gadget
-   ```http
-   PATCH /api/gadgets/:id
-   Content-Type: application/json
-   {
-     "status": "Deployed"
-   }
-   ```
+```json
+{
+  "id": "6f1c...",
+  "name": "Laser Watch",
+  "codename": "The Phoenix",
+  "status": "Available",
+  "missionSuccessProbability": 85,
+  "decommissionedAt": null,
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+```
 
-#### Decommission Gadget
-   ```http
-   DELETE /api/gadgets/:id
-   ```
+### Data models
 
-#### Initiate Self-Destruct
-   ```http
-   POST /api/gadgets/:id/self-destruct
-   ```
+| Model | Fields |
+| --- | --- |
+| `User` | `id` (UUID), `username` (unique), `password` (bcrypt hash) |
+| `Gadget` | `id` (UUID), `name`, `codename` (unique), `status` (enum), `missionSuccessProbability` (float), `decommissionedAt` (date, nullable) |
 
-## Data Models
+## Deployment (Render)
 
-### Gadget Model
-   ```json
-   {
-     "id": "UUID",
-     "name": "String",
-     "codename": "String",
-     "status": "Enum['Available', 'Deployed', 'Destroyed', 'Decommissioned']",
-     "decommissionedAt": "Date",
-     "missionSuccessProbability": "Float"
-   }
-   ```
-
-### User Model
-   ```json
-   {
-     "id": "UUID",
-     "username": "String",
-     "password": "String (hashed)"
-   }
-   ```
-
-## Error Handling
-
-The API uses standard HTTP status codes:
-- 200: Success
-- 201: Created
-- 400: Bad Request
-- 401: Unauthorized
-- 404: Not Found
-- 500: Server Error
-
-## Security Features
-- JWT-based authentication
-- Password hashing with bcrypt
-- Protected routes
-- Secure database operations
-- Input validation
-
-## Development
-   ```bash
-   # Run in development mode with hot reload
-   npm run dev
-   
-   # Run in production mode
-   npm start
-   ```
-
-## Testing
-Use Thunder Client or Postman to test the endpoints:
-
-**Base URLs:**
-- Local: `http://localhost:3000`
-- Production: `https://imf-gadget-api-dhbc.onrender.com`
-
-## Deployment
-The API is deployed on Render. To deploy your own instance:
-
-1. Create a Render account
-2. Create a new PostgreSQL database
-3. Create a new Web Service
-4. Connect your GitHub repository
-5. Add environment variables:
-   ```bash
-   DATABASE_URL=your_render_postgres_url
-   NODE_ENV=production
-   JWT_SECRET=your_secret
-   PORT=3000
-   ```
-
-## Contributing
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
+`render.yaml` defines a Node web service (`npm install` / `npm start`) and a free PostgreSQL database named `imf_gadgets`. `DATABASE_URL` is wired from the database and `JWT_SECRET` is generated automatically. To deploy it, create a new Blueprint in Render from this repository.
