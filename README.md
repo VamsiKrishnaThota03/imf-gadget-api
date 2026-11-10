@@ -28,10 +28,11 @@ This is the part worth reading. A free managed Postgres sleeps when idle and
 takes 30-60s to wake, and the original startup sequence was:
 
 ```js
-sequelize.authenticate()
+sequelize
+  .authenticate()
   .then(() => sequelize.sync())
   .then(() => app.listen(PORT, HOST))
-  .catch(() => process.exit(1));   // <- a sleeping database kills the process
+  .catch(() => process.exit(1)); // <- a sleeping database kills the process
 ```
 
 A single failed connection exited the process before the port was ever opened.
@@ -44,7 +45,7 @@ It now starts in the other order:
 1. **Listen first.** The port opens immediately, so the platform's health check
    against `/health` passes on the first try and never races a cold database.
 2. **Connect in the background, with backoff.** `connectWithRetry()` retries
-   forever with exponential backoff capped at 30s and *full jitter* (a random
+   forever with exponential backoff capped at 30s and _full jitter_ (a random
    delay inside the window), so several instances restarting together do not
    retry in lockstep against a database that is still waking.
 3. **Degrade, do not die.** Until the connection lands, `/api/*` answers
@@ -150,14 +151,14 @@ See [`.env.example`](.env.example).
 
 ### Scripts
 
-| Command       | Description                                                                                          |
-| ------------- | ---------------------------------------------------------------------------------------------------- |
-| `npm start`   | `node server.js`                                                                                     |
-| `npm run dev` | `nodemon server.js`                                                                                  |
-| `npm test`    | 13 tests (Node test runner + supertest) against an in-memory Postgres emulation, no database needed |
-| `npm run test:coverage` | Same, with coverage output |
-| `npm run lint` | ESLint (flat config) |
-| `npm run format:check` | Prettier, as CI runs it |
+| Command                 | Description                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `npm start`             | `node server.js`                                                                                    |
+| `npm run dev`           | `nodemon server.js`                                                                                 |
+| `npm test`              | 13 tests (Node test runner + supertest) against an in-memory Postgres emulation, no database needed |
+| `npm run test:coverage` | Same, with coverage output                                                                          |
+| `npm run lint`          | ESLint (flat config)                                                                                |
+| `npm run format:check`  | Prettier, as CI runs it                                                                             |
 
 ## API
 
@@ -226,12 +227,12 @@ and declares a `HEALTHCHECK`.
 
 ## Continuous integration
 
-| Job | What it proves |
-| --- | --- |
-| `test` (Node 20, 22) | ESLint, Prettier, and 13 tests against pg-mem |
-| `integration` | Boots the real server against a Postgres 16 service container, waits for liveness then readiness, registers an agent, creates and lists a gadget, and asserts a clean exit on `SIGTERM` |
-| `resilience` | Points `DATABASE_URL` at a dead port and asserts the process stays alive, keeps `/health` green, answers 503 on `/api/gadgets`, and logs retries |
-| `docker` | The image builds and refuses to start without `JWT_SECRET` |
+| Job                  | What it proves                                                                                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test` (Node 20, 22) | ESLint, Prettier, and 13 tests against pg-mem                                                                                                                                           |
+| `integration`        | Boots the real server against a Postgres 16 service container, waits for liveness then readiness, registers an agent, creates and lists a gadget, and asserts a clean exit on `SIGTERM` |
+| `resilience`         | Points `DATABASE_URL` at a dead port and asserts the process stays alive, keeps `/health` green, answers 503 on `/api/gadgets`, and logs retries                                        |
+| `docker`             | The image builds and refuses to start without `JWT_SECRET`                                                                                                                              |
 
 CodeQL runs weekly and on every push; Dependabot groups weekly patch/minor npm
 bumps and raises majors individually.
@@ -241,7 +242,7 @@ bumps and raises majors individually.
 `render.yaml` defines a Node web service (`npm ci --omit=dev` / `npm start`, health check on `/health`) and a free PostgreSQL database named `imf_gadgets`. `DATABASE_URL` is wired from the database and `JWT_SECRET` is generated automatically. The database's empty `ipAllowList` keeps it off the public internet; the web service reaches it over Render's private network. To deploy it, create a new Blueprint in Render from this repository.
 
 The health check targets `/health` (liveness) rather than `/health/ready` on
-purpose: the service is *meant* to stay up while the database is waking, and
+purpose: the service is _meant_ to stay up while the database is waking, and
 pointing the platform at readiness would restart it mid-retry.
 
 **Free-tier Postgres expires after 30 days.** When that happens no code change
