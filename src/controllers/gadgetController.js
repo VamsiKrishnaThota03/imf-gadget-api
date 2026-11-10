@@ -60,7 +60,6 @@ const createGadget = async (req, res, next) => {
     for (let attempt = 0; attempt < MAX_CODENAME_ATTEMPTS; attempt += 1) {
       const codename = attempt < 3 ? generateCodename() : generateTaggedCodename();
       try {
-        // eslint-disable-next-line no-await-in-loop
         const gadget = await Gadget.create({ name: name.trim(), codename });
         return res.status(201).json(gadget);
       } catch (error) {
@@ -82,7 +81,9 @@ const updateGadget = async (req, res, next) => {
     });
   }
   if (Object.keys(body).length === 0) {
-    return res.status(400).json({ message: `Provide at least one of: ${UPDATABLE_FIELDS.join(', ')}` });
+    return res
+      .status(400)
+      .json({ message: `Provide at least one of: ${UPDATABLE_FIELDS.join(', ')}` });
   }
   if (body.name !== undefined && !validateName(body.name)) {
     return res.status(400).json({ message: 'name must be 1-100 characters' });

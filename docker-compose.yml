@@ -1,0 +1,48 @@
+# Local development stack: Postgres + the API.
+#
+# Both published ports are bound to 127.0.0.1, so nothing in this stack is
+# reachable from the local network. The API reaches the database over the
+# compose network on the `db` hostname; the database publish is only a
+# convenience for psql and GUI clients.
+#
+#   printf 'POSTGRES_PASSWORD=%s\nJWT_SECRET=%s\n' "$(openssl rand -hex 16)" "$(openssl rand -hex 32)" > .env
+#   docker compose up --build
+#   open http://localhost:3000/api-docs
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: imf_gadgets
+      POSTGRES_USER: imf
+      # No default, so a throwaway password cannot become the shipped one.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U imf -d imf_gadgets']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: postgresql://imf:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/imf_gadgets
+      DB_SSL: 'false'
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
+    ports:
+      - '127.0.0.1:3000:3000'
+
+volumes:
+  pgdata:

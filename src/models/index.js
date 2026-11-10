@@ -8,7 +8,7 @@ const dbConfig = config[env] || config.development;
 let sequelize;
 if (env === 'test' && !process.env.DATABASE_URL) {
   // Tests run against an in-memory Postgres emulation (dev dependency only).
-  // eslint-disable-next-line global-require
+
   sequelize = require('./memoryDb')();
 } else {
   sequelize = new Sequelize(requireEnv('DATABASE_URL'), dbConfig);

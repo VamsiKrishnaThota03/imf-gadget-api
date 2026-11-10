@@ -8,7 +8,7 @@ const requireEnv = (name) => {
   const value = process.env[name];
   if (!value || !value.trim()) {
     throw new Error(
-      `Missing required environment variable ${name}. Copy .env.example to .env and set it.`
+      `Missing required environment variable ${name}. Copy .env.example to .env and set it.`,
     );
   }
   return value;

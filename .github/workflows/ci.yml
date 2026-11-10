@@ -1,0 +1,199 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      # The suite runs against pg-mem, so no service container is needed.
+      - name: Test
+        run: npm test
+
+  integration:
+    name: integration against real Postgres
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: imf_gadgets_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      - name: Boot the server against real Postgres and exercise it
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/imf_gadgets_test
+          DB_SSL: 'false'
+          JWT_SECRET: ci-only-secret-never-used-in-a-deployment
+          PORT: '3000'
+          HOST: 127.0.0.1
+        run: |
+          set -euo pipefail
+          node server.js & SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+
+          # Liveness must come up before the database is confirmed — that is the
+          # whole point of the degraded-start behaviour.
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3000/health | tee /dev/stderr | grep -q '"status":"ok"'
+
+          # Readiness should follow within a few seconds on a warm database.
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health/ready > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3000/health/ready | tee /dev/stderr | grep -q '"status":"ready"'
+
+          # A real round trip through Sequelize and Postgres.
+          token=$(curl -fsS -X POST http://127.0.0.1:3000/api/auth/register \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-agent","password":"mission-accepted"}' \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).token))")
+          test -n "$token"
+
+          curl -fsS -X POST http://127.0.0.1:3000/api/gadgets \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"name":"Exploding gum"}' | tee /dev/stderr | grep -q '"codename"'
+
+          curl -fsS http://127.0.0.1:3000/api/gadgets \
+            -H "Authorization: Bearer $token" | tee /dev/stderr | grep -q 'Exploding gum'
+
+      - name: Graceful shutdown closes the listener on SIGTERM
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/imf_gadgets_test
+          DB_SSL: 'false'
+          JWT_SECRET: ci-only-secret-never-used-in-a-deployment
+          PORT: '3001'
+          HOST: 127.0.0.1
+        run: |
+          set -euo pipefail
+          node server.js & SERVER_PID=$!
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:3001/health > /dev/null && break
+            sleep 1
+          done
+          kill -TERM $SERVER_PID
+          # Must exit on its own, not be killed by the 10s force timer.
+          for i in $(seq 1 15); do
+            if ! kill -0 $SERVER_PID 2>/dev/null; then echo "exited cleanly"; exit 0; fi
+            sleep 1
+          done
+          echo "::error::server did not shut down on SIGTERM"
+          exit 1
+
+  resilience:
+    name: survives an unreachable database
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      - name: Server stays up and serves 503s when Postgres is absent
+        env:
+          # Nothing is listening on this port: the regression this guards is the
+          # old behaviour of exiting 1 and crash-looping.
+          DATABASE_URL: postgresql://nobody:nothing@127.0.0.1:59999/absent
+          DB_SSL: 'false'
+          JWT_SECRET: ci-only-secret-never-used-in-a-deployment
+          PORT: '3000'
+          HOST: 127.0.0.1
+        run: |
+          set -euo pipefail
+          node server.js > server.log 2>&1 & SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:3000/health > /dev/null && break
+            sleep 1
+          done
+
+          # Still alive after the retry loop has failed several times.
+          sleep 8
+          kill -0 $SERVER_PID || { echo "::error::server exited with no database"; cat server.log; exit 1; }
+
+          curl -fsS http://127.0.0.1:3000/health | grep -q '"status":"ok"'
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/gadgets)
+          test "$code" = "503" || { echo "::error::expected 503, got $code"; exit 1; }
+
+          grep -q "retrying in" server.log || { echo "::error::no retry logged"; cat server.log; exit 1; }
+          echo "stayed up and degraded correctly"
+
+  docker:
+    name: docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: imf-gadget-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image refuses to start without JWT_SECRET
+        run: |
+          output=$(docker run --rm -e DATABASE_URL=postgresql://x:y@127.0.0.1:1/z \
+            imf-gadget-api:ci 2>&1 || true)
+          echo "$output"
+          echo "$output" | grep -q "JWT_SECRET" \
+            || { echo "::error::expected a JWT_SECRET configuration error"; exit 1; }

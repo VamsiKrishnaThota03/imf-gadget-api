@@ -6,7 +6,6 @@
 const { Sequelize } = require('sequelize');
 
 module.exports = function createMemorySequelize() {
-  // eslint-disable-next-line global-require
   const { newDb } = require('pg-mem');
   const mem = newDb();
 

@@ -11,7 +11,9 @@ const auth = (req, res, next) => {
   try {
     req.user = jwt.verify(token, requireEnv('JWT_SECRET'), { algorithms: ['HS256'] });
     return next();
-  } catch (error) {
+  } catch {
+    // Every verification failure — expired, bad signature, wrong algorithm —
+    // reports the same message, so a caller cannot probe for valid token shapes.
     return res.status(401).json({ message: 'Please authenticate' });
   }
 };

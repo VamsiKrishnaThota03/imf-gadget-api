@@ -5,6 +5,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const gadgetRoutes = require('./routes/gadgetRoutes');
 const authRoutes = require('./routes/authRoutes');
+const readiness = require('./config/readiness');
 
 const app = express();
 app.disable('x-powered-by');
@@ -24,15 +25,35 @@ app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10kb' }));
 
 app.get('/', (req, res) => res.redirect('/api-docs'));
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  explorer: true,
-  customSiteTitle: 'IMF Gadget API',
-  swaggerOptions: {
-    persistAuthorization: true,
-  },
-}));
+// Liveness: the process is accepting connections. Deliberately independent of
+// the database, so the platform does not restart a healthy process — and lose
+// the in-progress connection retries — while the database is still waking.
+app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+
+// Readiness: the process can actually serve data, and why not when it cannot.
+app.get('/health/ready', (req, res) => {
+  const state = readiness.getState();
+  if (state.ready) return res.json({ status: 'ready', attempts: state.attempts });
+  res.set('Retry-After', '30');
+  return res.status(503).json({
+    status: 'unavailable',
+    attempts: state.attempts,
+    lastError: state.lastError,
+  });
+});
+
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    explorer: true,
+    customSiteTitle: 'IMF Gadget API',
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  }),
+);
 
 // Slow down credential stuffing / brute force on the auth endpoints.
 const authLimiter = rateLimit({
@@ -43,14 +64,18 @@ const authLimiter = rateLimit({
   message: { message: 'Too many attempts, please try again later' },
 });
 
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/gadgets', gadgetRoutes);
+// Both route trees need the database, so they short-circuit to a 503 with
+// Retry-After until the connection is up, rather than surfacing a Sequelize
+// connection error as an opaque 500.
+app.use('/api/auth', authLimiter, readiness.requireDatabase, authRoutes);
+app.use('/api/gadgets', readiness.requireDatabase, gadgetRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Not found' });
 });
 
-// eslint-disable-next-line no-unused-vars
+// Express identifies an error handler by its four-parameter signature, so
+// `next` must stay declared even though it is never called here.
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ message: 'Malformed JSON body' });

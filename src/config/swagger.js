@@ -7,7 +7,8 @@ const options = {
     info: {
       title: 'IMF Gadget API',
       version: '1.0.0',
-      description: 'Mission: Impossible-themed API for managing IMF gadgets. Register or log in, then click Authorize and paste the token.',
+      description:
+        'Mission: Impossible-themed API for managing IMF gadgets. Register or log in, then click Authorize and paste the token.',
     },
     servers: [
       {
@@ -21,7 +22,7 @@ const options = {
       {
         url: 'http://localhost:3000',
         description: 'Development server',
-      }
+      },
     ],
     components: {
       securitySchemes: {
@@ -36,4 +37,4 @@ const options = {
   apis: [path.join(__dirname, '../routes/*.js')], // JSDoc-annotated route files
 };
 
-module.exports = swaggerJsdoc(options); 
+module.exports = swaggerJsdoc(options);
